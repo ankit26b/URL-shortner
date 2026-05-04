@@ -7,6 +7,9 @@ import (
 
 	"url-shortener/internal/config"
 	"url-shortener/internal/handler"
+	urlhandler "url-shortener/internal/handler/url"
+	"url-shortener/internal/repository"
+	"url-shortener/internal/service"
 )
 
 func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) *gin.Engine {
@@ -18,14 +21,17 @@ func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
 
-	_ = db
 	_ = rdb
 
-	h := handler.NewHealthHandler()
+	healthHandler := handler.NewHealthHandler()
+	urlRepo := repository.NewURLRepository(db)
+	shortenerService := service.NewShortenerService(urlRepo)
+	shortenHandler := urlhandler.NewShortenHandler(shortenerService)
 
 	v1 := r.Group("/api/v1")
 	{
-		v1.GET("/health", h.Health)
+		v1.GET("/health", healthHandler.Health)
+		v1.POST("/shorten", shortenHandler.Shorten)
 	}
 
 	return r
