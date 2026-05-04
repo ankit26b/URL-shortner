@@ -28,11 +28,15 @@ Production-ready backend scaffold for a URL shortener service using:
    ```bash
    docker compose up -d postgres redis
    ```
-3. Run app:
+3. Run migrations in `migrations/`.
+4. Run app:
    ```bash
    go run ./cmd/api
    ```
 
-## Endpoint
+## Endpoints
 
 - `GET /api/v1/health` → `200 OK`
+- `POST /api/v1/shorten` → `200 OK`
+  - Request body: `{ "long_url": "https://example.com/very/long/path" }`
+  - Response body: `{ "short_code": "abc123" }`
