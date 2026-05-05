@@ -20,10 +20,10 @@ var ErrLinkExpired = errors.New("link expired")
 var ErrInvalidExpiryTime = errors.New("invalid expiry time")
 
 type ShortenerService struct {
-	repo *repository.URLRepository
+	repo repository.URLStore
 }
 
-func NewShortenerService(repo *repository.URLRepository) *ShortenerService {
+func NewShortenerService(repo repository.URLStore) *ShortenerService {
 	return &ShortenerService{repo: repo}
 }
 

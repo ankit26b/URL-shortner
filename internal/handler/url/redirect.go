@@ -14,6 +14,7 @@ import (
 	"github.com/go-redis/redis/v8"
 
 	"url-shortener/internal/cache"
+	"url-shortener/internal/monitoring"
 	"url-shortener/internal/service"
 )
 
@@ -21,14 +22,18 @@ type RedirectHandler struct {
 	service        *service.ShortenerService
 	cache          cache.URLCache
 	analyticsQueue AnalyticsPublisher
+	hooks          monitoring.Hooks
 }
 
 type AnalyticsPublisher interface {
 	Publish(event model.ClickEvent) error
 }
 
-func NewRedirectHandler(service *service.ShortenerService, cache cache.URLCache, analyticsQueue AnalyticsPublisher) *RedirectHandler {
-	return &RedirectHandler{service: service, cache: cache, analyticsQueue: analyticsQueue}
+func NewRedirectHandler(service *service.ShortenerService, cache cache.URLCache, analyticsQueue AnalyticsPublisher, hooks monitoring.Hooks) *RedirectHandler {
+	if hooks == nil {
+		hooks = monitoring.NoopHooks{}
+	}
+	return &RedirectHandler{service: service, cache: cache, analyticsQueue: analyticsQueue, hooks: hooks}
 }
 
 func (h *RedirectHandler) Redirect(c *gin.Context) {
@@ -40,6 +45,7 @@ func (h *RedirectHandler) Redirect(c *gin.Context) {
 
 	if h.cache != nil {
 		if cachedURL, err := h.cache.Get(c.Request.Context(), shortCode); err == nil {
+			h.hooks.Observe("redirect_cache_hit")
 			h.trackRedirectAsync(c, shortCode)
 			c.Redirect(http.StatusFound, cachedURL)
 			return
@@ -60,6 +66,7 @@ func (h *RedirectHandler) Redirect(c *gin.Context) {
 		}
 		return
 	}
+	h.hooks.Observe("redirect_db_hit")
 
 	if h.cache != nil {
 		go func() {

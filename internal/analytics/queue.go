@@ -15,12 +15,12 @@ var ErrQueueFull = errors.New("analytics queue is full")
 
 type Queue struct {
 	events     chan model.ClickEvent
-	repo       *repository.ClickRepository
+	repo       repository.ClickStore
 	workerWG   sync.WaitGroup
 	workerOnce sync.Once
 }
 
-func NewQueue(bufferSize int, repo *repository.ClickRepository) *Queue {
+func NewQueue(bufferSize int, repo repository.ClickStore) *Queue {
 	if bufferSize <= 0 {
 		bufferSize = 1024
 	}

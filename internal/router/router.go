@@ -11,6 +11,7 @@ import (
 	"url-shortener/internal/handler"
 	urlhandler "url-shortener/internal/handler/url"
 	"url-shortener/internal/middleware"
+	"url-shortener/internal/monitoring"
 	"url-shortener/internal/repository"
 	"url-shortener/internal/service"
 )
@@ -28,22 +29,35 @@ func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) (*gin.Engine, 
 	urlRepo := repository.NewURLRepository(db)
 	shortenerService := service.NewShortenerService(urlRepo)
 	shortenHandler := urlhandler.NewShortenHandler(shortenerService)
-	rateLimiter := middleware.NewRateLimiter(rdb, cfg.RateLimitRequests, cfg.RateLimitWindow)
+
+	var rateLimitMiddleware gin.HandlerFunc = func(c *gin.Context) { c.Next() }
+	if cfg.FeatureRateLimitEnabled {
+		rateLimiter := middleware.NewRateLimiter(rdb, cfg.RateLimitRequests, cfg.RateLimitWindow)
+		rateLimitMiddleware = rateLimiter.Middleware()
+	}
 
 	var urlCache cache.URLCache
-	if rdb != nil {
+	if cfg.FeatureCacheEnabled && rdb != nil {
 		urlCache = cache.NewRedisURLCache(rdb, cfg.RedisCacheTTL)
 	}
 
 	clickRepo := repository.NewClickRepository(db)
 	analyticsQueue := analytics.NewQueue(2048, clickRepo)
+	if !cfg.FeatureAnalyticsEnabled {
+		analyticsQueue = nil
+	}
 
-	redirectHandler := urlhandler.NewRedirectHandler(shortenerService, urlCache, analyticsQueue)
+	var hooks monitoring.Hooks = monitoring.NoopHooks{}
+	if cfg.FeatureMonitoringEnabled {
+		hooks = monitoring.LogHooks{}
+	}
+
+	redirectHandler := urlhandler.NewRedirectHandler(shortenerService, urlCache, analyticsQueue, hooks)
 
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/health", healthHandler.Health)
-		v1.POST("/shorten", rateLimiter.Middleware(), shortenHandler.Shorten)
+		v1.POST("/shorten", rateLimitMiddleware, shortenHandler.Shorten)
 	}
 
 	r.GET("/:short_code", redirectHandler.Redirect)
