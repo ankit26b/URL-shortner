@@ -34,6 +34,9 @@ type Config struct {
 	RedisReadTimeout  time.Duration
 	RedisWriteTimeout time.Duration
 	RedisCacheTTL     time.Duration
+
+	RateLimitRequests int64
+	RateLimitWindow   time.Duration
 }
 
 func Load() (*Config, error) {
@@ -64,6 +67,9 @@ func Load() (*Config, error) {
 		RedisReadTimeout:  getDurationEnv("REDIS_READ_TIMEOUT", 3*time.Second),
 		RedisWriteTimeout: getDurationEnv("REDIS_WRITE_TIMEOUT", 3*time.Second),
 		RedisCacheTTL:     getDurationEnv("REDIS_CACHE_TTL", 10*time.Minute),
+
+		RateLimitRequests: int64(getIntEnv("RATE_LIMIT_REQUESTS", 100)),
+		RateLimitWindow:   getDurationEnv("RATE_LIMIT_WINDOW", time.Minute),
 	}
 
 	if cfg.AppPort == "" {
