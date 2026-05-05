@@ -17,6 +17,7 @@ const base62Alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRST
 var ErrInvalidURL = errors.New("invalid URL format")
 var ErrShortCodeNotFound = errors.New("short code not found")
 var ErrLinkExpired = errors.New("link expired")
+var ErrInvalidExpiryTime = errors.New("invalid expiry time")
 
 type ShortenerService struct {
 	repo *repository.URLRepository
@@ -26,10 +27,13 @@ func NewShortenerService(repo *repository.URLRepository) *ShortenerService {
 	return &ShortenerService{repo: repo}
 }
 
-func (s *ShortenerService) Shorten(ctx context.Context, longURL string) (string, error) {
+func (s *ShortenerService) Shorten(ctx context.Context, longURL string, expiresAt *time.Time) (string, error) {
 	normalized, err := validateAndNormalizeURL(longURL)
 	if err != nil {
 		return "", err
+	}
+	if expiresAt != nil && !expiresAt.After(time.Now().UTC()) {
+		return "", ErrInvalidExpiryTime
 	}
 
 	existing, err := s.repo.FindByLongURL(ctx, normalized)
@@ -46,7 +50,7 @@ func (s *ShortenerService) Shorten(ctx context.Context, longURL string) (string,
 	}
 
 	shortCode := encodeBase62(id)
-	mapping, err := s.repo.Insert(ctx, normalized, shortCode)
+	mapping, err := s.repo.Insert(ctx, normalized, shortCode, expiresAt)
 	if err != nil {
 		return "", err
 	}

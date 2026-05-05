@@ -38,7 +38,8 @@ Production-ready backend scaffold for a URL shortener service using:
 
 - `GET /api/v1/health` → `200 OK`
 - `POST /api/v1/shorten` → `200 OK`
-  - Request body: `{ "long_url": "https://example.com/very/long/path" }`
+  - Request body: `{ "long_url": "https://example.com/very/long/path", "expiry_time": "2026-12-31T23:59:59Z" }`
+    - `expiry_time` is optional and must be an RFC3339 timestamp in the future.
   - Response body: `{ "short_code": "abc123" }`
 - `GET /:short_code` → `302 Found`
   - Redirects to original URL when found and active.

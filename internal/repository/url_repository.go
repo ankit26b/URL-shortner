@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -38,11 +39,11 @@ func (r *URLRepository) FindByShortCode(ctx context.Context, shortCode string) (
 	return &m, nil
 }
 
-func (r *URLRepository) Insert(ctx context.Context, longURL, shortCode string) (*model.URLMapping, error) {
-	const query = `INSERT INTO urls (long_url, short_code) VALUES ($1, $2) RETURNING id, long_url, short_code, expires_at`
+func (r *URLRepository) Insert(ctx context.Context, longURL, shortCode string, expiresAt *time.Time) (*model.URLMapping, error) {
+	const query = `INSERT INTO urls (long_url, short_code, expires_at) VALUES ($1, $2, $3) RETURNING id, long_url, short_code, expires_at`
 
 	var m model.URLMapping
-	err := r.db.QueryRow(ctx, query, longURL, shortCode).Scan(&m.ID, &m.LongURL, &m.ShortCode, &m.ExpiresAt)
+	err := r.db.QueryRow(ctx, query, longURL, shortCode, expiresAt).Scan(&m.ID, &m.LongURL, &m.ShortCode, &m.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
