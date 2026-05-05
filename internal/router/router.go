@@ -10,6 +10,7 @@ import (
 	"url-shortener/internal/config"
 	"url-shortener/internal/handler"
 	urlhandler "url-shortener/internal/handler/url"
+	"url-shortener/internal/middleware"
 	"url-shortener/internal/repository"
 	"url-shortener/internal/service"
 )
@@ -27,6 +28,7 @@ func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) (*gin.Engine, 
 	urlRepo := repository.NewURLRepository(db)
 	shortenerService := service.NewShortenerService(urlRepo)
 	shortenHandler := urlhandler.NewShortenHandler(shortenerService)
+	rateLimiter := middleware.NewRateLimiter(rdb, cfg.RateLimitRequests, cfg.RateLimitWindow)
 
 	var urlCache cache.URLCache
 	if rdb != nil {
@@ -41,7 +43,7 @@ func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) (*gin.Engine, 
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/health", healthHandler.Health)
-		v1.POST("/shorten", shortenHandler.Shorten)
+		v1.POST("/shorten", rateLimiter.Middleware(), shortenHandler.Shorten)
 	}
 
 	r.GET("/:short_code", redirectHandler.Redirect)
