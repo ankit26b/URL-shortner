@@ -1,6 +1,25 @@
 version: "3.9"
 
 services:
+  app:
+    build:
+      context: .
+      target: dev
+    container_name: shortener-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/src
+    command: ["go", "run", "./cmd/api"]
+
   postgres:
     image: postgres:16-alpine
     container_name: shortener-postgres
