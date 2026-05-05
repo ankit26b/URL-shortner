@@ -11,15 +11,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 
+	"url-shortener/internal/cache"
 	"url-shortener/internal/service"
 )
 
 type RedirectHandler struct {
 	service *service.ShortenerService
-	cache   *redis.Client
+	cache   cache.URLCache
 }
 
-func NewRedirectHandler(service *service.ShortenerService, cache *redis.Client) *RedirectHandler {
+func NewRedirectHandler(service *service.ShortenerService, cache cache.URLCache) *RedirectHandler {
 	return &RedirectHandler{service: service, cache: cache}
 }
 
@@ -31,10 +32,12 @@ func (h *RedirectHandler) Redirect(c *gin.Context) {
 	}
 
 	if h.cache != nil {
-		if cachedURL, err := h.cache.Get(c.Request.Context(), "url:"+shortCode).Result(); err == nil {
+		if cachedURL, err := h.cache.Get(c.Request.Context(), shortCode); err == nil {
 			h.logRequestAsync(c, shortCode, true)
 			c.Redirect(http.StatusFound, cachedURL)
 			return
+		} else if !errors.Is(err, redis.Nil) {
+			log.Printf("redis get failed for short_code=%s: %v", shortCode, err)
 		}
 	}
 
@@ -55,7 +58,9 @@ func (h *RedirectHandler) Redirect(c *gin.Context) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
-			_ = h.cache.Set(ctx, "url:"+shortCode, longURL, 10*time.Minute).Err()
+			if err := h.cache.Set(ctx, shortCode, longURL); err != nil {
+				log.Printf("redis set failed for short_code=%s: %v", shortCode, err)
+			}
 		}()
 	}
 

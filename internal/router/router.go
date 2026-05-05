@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"url-shortener/internal/cache"
 	"url-shortener/internal/config"
 	"url-shortener/internal/handler"
 	urlhandler "url-shortener/internal/handler/url"
@@ -21,13 +22,17 @@ func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
 
-	_ = rdb
-
 	healthHandler := handler.NewHealthHandler()
 	urlRepo := repository.NewURLRepository(db)
 	shortenerService := service.NewShortenerService(urlRepo)
 	shortenHandler := urlhandler.NewShortenHandler(shortenerService)
-	redirectHandler := urlhandler.NewRedirectHandler(shortenerService, rdb)
+
+	var urlCache cache.URLCache
+	if rdb != nil {
+		urlCache = cache.NewRedisURLCache(rdb, cfg.RedisCacheTTL)
+	}
+
+	redirectHandler := urlhandler.NewRedirectHandler(shortenerService, urlCache)
 
 	v1 := r.Group("/api/v1")
 	{
