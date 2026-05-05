@@ -27,12 +27,15 @@ func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) *gin.Engine {
 	urlRepo := repository.NewURLRepository(db)
 	shortenerService := service.NewShortenerService(urlRepo)
 	shortenHandler := urlhandler.NewShortenHandler(shortenerService)
+	redirectHandler := urlhandler.NewRedirectHandler(shortenerService, rdb)
 
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/health", healthHandler.Health)
 		v1.POST("/shorten", shortenHandler.Shorten)
 	}
+
+	r.GET("/:short_code", redirectHandler.Redirect)
 
 	return r
 }

@@ -17,10 +17,10 @@ func NewURLRepository(db *pgxpool.Pool) *URLRepository {
 }
 
 func (r *URLRepository) FindByLongURL(ctx context.Context, longURL string) (*model.URLMapping, error) {
-	const query = `SELECT id, long_url, short_code FROM urls WHERE long_url = $1`
+	const query = `SELECT id, long_url, short_code, expires_at FROM urls WHERE long_url = $1`
 
 	var m model.URLMapping
-	err := r.db.QueryRow(ctx, query, longURL).Scan(&m.ID, &m.LongURL, &m.ShortCode)
+	err := r.db.QueryRow(ctx, query, longURL).Scan(&m.ID, &m.LongURL, &m.ShortCode, &m.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -28,10 +28,10 @@ func (r *URLRepository) FindByLongURL(ctx context.Context, longURL string) (*mod
 }
 
 func (r *URLRepository) FindByShortCode(ctx context.Context, shortCode string) (*model.URLMapping, error) {
-	const query = `SELECT id, long_url, short_code FROM urls WHERE short_code = $1`
+	const query = `SELECT id, long_url, short_code, expires_at FROM urls WHERE short_code = $1`
 
 	var m model.URLMapping
-	err := r.db.QueryRow(ctx, query, shortCode).Scan(&m.ID, &m.LongURL, &m.ShortCode)
+	err := r.db.QueryRow(ctx, query, shortCode).Scan(&m.ID, &m.LongURL, &m.ShortCode, &m.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -39,10 +39,10 @@ func (r *URLRepository) FindByShortCode(ctx context.Context, shortCode string) (
 }
 
 func (r *URLRepository) Insert(ctx context.Context, longURL, shortCode string) (*model.URLMapping, error) {
-	const query = `INSERT INTO urls (long_url, short_code) VALUES ($1, $2) RETURNING id, long_url, short_code`
+	const query = `INSERT INTO urls (long_url, short_code) VALUES ($1, $2) RETURNING id, long_url, short_code, expires_at`
 
 	var m model.URLMapping
-	err := r.db.QueryRow(ctx, query, longURL, shortCode).Scan(&m.ID, &m.LongURL, &m.ShortCode)
+	err := r.db.QueryRow(ctx, query, longURL, shortCode).Scan(&m.ID, &m.LongURL, &m.ShortCode, &m.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
