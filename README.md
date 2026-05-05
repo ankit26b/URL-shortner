@@ -40,3 +40,7 @@ Production-ready backend scaffold for a URL shortener service using:
 - `POST /api/v1/shorten` → `200 OK`
   - Request body: `{ "long_url": "https://example.com/very/long/path" }`
   - Response body: `{ "short_code": "abc123" }`
+- `GET /:short_code` → `302 Found`
+  - Redirects to original URL when found and active.
+  - Returns `404` for unknown short codes.
+  - Returns `410` for expired links.

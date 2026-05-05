@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -14,6 +15,8 @@ import (
 const base62Alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 var ErrInvalidURL = errors.New("invalid URL format")
+var ErrShortCodeNotFound = errors.New("short code not found")
+var ErrLinkExpired = errors.New("link expired")
 
 type ShortenerService struct {
 	repo *repository.URLRepository
@@ -49,6 +52,22 @@ func (s *ShortenerService) Shorten(ctx context.Context, longURL string) (string,
 	}
 
 	return mapping.ShortCode, nil
+}
+
+func (s *ShortenerService) Resolve(ctx context.Context, shortCode string) (string, error) {
+	mapping, err := s.repo.FindByShortCode(ctx, shortCode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrShortCodeNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+
+	if mapping.ExpiresAt != nil && mapping.ExpiresAt.Before(time.Now().UTC()) {
+		return "", ErrLinkExpired
+	}
+
+	return mapping.LongURL, nil
 }
 
 func (s *ShortenerService) nextID(ctx context.Context) (int64, error) {
