@@ -1,0 +1,72 @@
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+variables:
+  GO_VERSION: "1.23"
+  CGO_ENABLED: "0"
+  DOCKER_TLS_CERTDIR: "/certs"
+
+.default_go:
+  image: golang:${GO_VERSION}-alpine
+  before_script:
+    - go version
+    - go mod download
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - /go/pkg/mod
+      - .cache/go-build
+
+lint:
+  stage: lint
+  extends: .default_go
+  script:
+    - test -z "$(gofmt -l .)"
+    - go vet ./...
+
+test:
+  stage: test
+  extends: .default_go
+  script:
+    - go test -race -count=1 ./...
+
+build:image:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  script:
+    - docker build --target runtime -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA" .
+    - echo "Build completed for $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+
+build:binary:
+  stage: build
+  extends: .default_go
+  script:
+    - go build -trimpath -ldflags="-s -w" -o bin/url-shortener ./cmd/api
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - bin/url-shortener
+
+deploy:mock:
+  stage: deploy
+  image: alpine:3.20
+  needs:
+    - build:image
+    - build:binary
+    - test
+    - lint
+  script:
+    - echo "[MOCK DEPLOY] Deploying commit ${CI_COMMIT_SHA} to ${CI_ENVIRONMENT_NAME:-staging}"
+    - echo "[MOCK DEPLOY] No infrastructure changes are performed in this stage"
+  environment:
+    name: staging
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - when: manual
+      allow_failure: true
