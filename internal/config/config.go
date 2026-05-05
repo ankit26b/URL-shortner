@@ -33,6 +33,7 @@ type Config struct {
 	RedisDialTimeout  time.Duration
 	RedisReadTimeout  time.Duration
 	RedisWriteTimeout time.Duration
+	RedisCacheTTL     time.Duration
 }
 
 func Load() (*Config, error) {
@@ -62,6 +63,7 @@ func Load() (*Config, error) {
 		RedisDialTimeout:  getDurationEnv("REDIS_DIAL_TIMEOUT", 5*time.Second),
 		RedisReadTimeout:  getDurationEnv("REDIS_READ_TIMEOUT", 3*time.Second),
 		RedisWriteTimeout: getDurationEnv("REDIS_WRITE_TIMEOUT", 3*time.Second),
+		RedisCacheTTL:     getDurationEnv("REDIS_CACHE_TTL", 10*time.Minute),
 	}
 
 	if cfg.AppPort == "" {

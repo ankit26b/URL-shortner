@@ -35,9 +35,10 @@ func main() {
 
 	rdb, err := redis.New(cfg)
 	if err != nil {
-		lg.Fatalf("failed to initialize redis: %v", err)
+		lg.Printf("redis unavailable, continuing without cache: %v", err)
+	} else {
+		defer rdb.Close()
 	}
-	defer rdb.Close()
 
 	r := router.New(cfg, pg, rdb)
 
