@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"url-shortener/internal/analytics"
 	"url-shortener/internal/cache"
 	"url-shortener/internal/config"
 	"url-shortener/internal/handler"
@@ -13,7 +14,7 @@ import (
 	"url-shortener/internal/service"
 )
 
-func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) *gin.Engine {
+func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) (*gin.Engine, *analytics.Queue) {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -32,7 +33,10 @@ func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) *gin.Engine {
 		urlCache = cache.NewRedisURLCache(rdb, cfg.RedisCacheTTL)
 	}
 
-	redirectHandler := urlhandler.NewRedirectHandler(shortenerService, urlCache)
+	clickRepo := repository.NewClickRepository(db)
+	analyticsQueue := analytics.NewQueue(2048, clickRepo)
+
+	redirectHandler := urlhandler.NewRedirectHandler(shortenerService, urlCache, analyticsQueue)
 
 	v1 := r.Group("/api/v1")
 	{
@@ -42,5 +46,5 @@ func New(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client) *gin.Engine {
 
 	r.GET("/:short_code", redirectHandler.Redirect)
 
-	return r
+	return r, analyticsQueue
 }

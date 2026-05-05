@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"url-shortener/internal/model"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 
@@ -16,12 +18,17 @@ import (
 )
 
 type RedirectHandler struct {
-	service *service.ShortenerService
-	cache   cache.URLCache
+	service        *service.ShortenerService
+	cache          cache.URLCache
+	analyticsQueue AnalyticsPublisher
 }
 
-func NewRedirectHandler(service *service.ShortenerService, cache cache.URLCache) *RedirectHandler {
-	return &RedirectHandler{service: service, cache: cache}
+type AnalyticsPublisher interface {
+	Publish(event model.ClickEvent) error
+}
+
+func NewRedirectHandler(service *service.ShortenerService, cache cache.URLCache, analyticsQueue AnalyticsPublisher) *RedirectHandler {
+	return &RedirectHandler{service: service, cache: cache, analyticsQueue: analyticsQueue}
 }
 
 func (h *RedirectHandler) Redirect(c *gin.Context) {
@@ -33,7 +40,7 @@ func (h *RedirectHandler) Redirect(c *gin.Context) {
 
 	if h.cache != nil {
 		if cachedURL, err := h.cache.Get(c.Request.Context(), shortCode); err == nil {
-			h.logRequestAsync(c, shortCode, true)
+			h.trackRedirectAsync(c, shortCode)
 			c.Redirect(http.StatusFound, cachedURL)
 			return
 		} else if !errors.Is(err, redis.Nil) {
@@ -64,14 +71,25 @@ func (h *RedirectHandler) Redirect(c *gin.Context) {
 		}()
 	}
 
-	h.logRequestAsync(c, shortCode, false)
+	h.trackRedirectAsync(c, shortCode)
 	c.Redirect(http.StatusFound, longURL)
 }
 
-func (h *RedirectHandler) logRequestAsync(c *gin.Context, shortCode string, cacheHit bool) {
-	ip := c.ClientIP()
-	ua := c.GetHeader("User-Agent")
+func (h *RedirectHandler) trackRedirectAsync(c *gin.Context, shortCode string) {
+	if h.analyticsQueue == nil {
+		return
+	}
+
+	event := model.ClickEvent{
+		ShortCode: shortCode,
+		Timestamp: time.Now().UTC(),
+		IP:        c.ClientIP(),
+		UserAgent: c.GetHeader("User-Agent"),
+	}
+
 	go func() {
-		log.Printf("redirect short_code=%s ip=%s cache_hit=%t user_agent=%q", shortCode, ip, cacheHit, ua)
+		if err := h.analyticsQueue.Publish(event); err != nil {
+			log.Printf("failed to queue analytics event for short_code=%s: %v", shortCode, err)
+		}
 	}()
 }
