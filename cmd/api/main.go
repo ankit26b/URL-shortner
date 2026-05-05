@@ -41,7 +41,9 @@ func main() {
 	}
 
 	r, analyticsQueue := router.New(cfg, pg, rdb)
-	defer analyticsQueue.Shutdown()
+	if analyticsQueue != nil {
+		defer analyticsQueue.Shutdown()
+	}
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.AppPort),

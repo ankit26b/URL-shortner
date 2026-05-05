@@ -37,6 +37,11 @@ type Config struct {
 
 	RateLimitRequests int64
 	RateLimitWindow   time.Duration
+
+	FeatureCacheEnabled      bool
+	FeatureAnalyticsEnabled  bool
+	FeatureRateLimitEnabled  bool
+	FeatureMonitoringEnabled bool
 }
 
 func Load() (*Config, error) {
@@ -70,6 +75,11 @@ func Load() (*Config, error) {
 
 		RateLimitRequests: int64(getIntEnv("RATE_LIMIT_REQUESTS", 100)),
 		RateLimitWindow:   getDurationEnv("RATE_LIMIT_WINDOW", time.Minute),
+
+		FeatureCacheEnabled:      getBoolEnv("FEATURE_CACHE_ENABLED", true),
+		FeatureAnalyticsEnabled:  getBoolEnv("FEATURE_ANALYTICS_ENABLED", true),
+		FeatureRateLimitEnabled:  getBoolEnv("FEATURE_RATE_LIMIT_ENABLED", true),
+		FeatureMonitoringEnabled: getBoolEnv("FEATURE_MONITORING_ENABLED", true),
 	}
 
 	if cfg.AppPort == "" {
@@ -122,6 +132,16 @@ func getInt32Env(key string, fallback int32) int32 {
 		i, err := strconv.Atoi(v)
 		if err == nil {
 			return int32(i)
+		}
+	}
+	return fallback
+}
+
+func getBoolEnv(key string, fallback bool) bool {
+	if v, ok := os.LookupEnv(key); ok {
+		b, err := strconv.ParseBool(v)
+		if err == nil {
+			return b
 		}
 	}
 	return fallback
